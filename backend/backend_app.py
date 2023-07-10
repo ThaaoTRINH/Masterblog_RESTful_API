@@ -1,3 +1,5 @@
+import json
+import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
@@ -5,23 +7,33 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)  # This will enable CORS for all routes
 
-POSTS = [
-    {"id": 1, "title": "First post", "content": "This is the first post.", "author": "Thao", "date": "2023-06-27"},
-    {"id": 2, "title": "Second post", "content": "This is the second post."},
-    {"id": 3, "title": "New post", "content": "Something is new."}
-]
+app_dir = os.path.dirname(os.path.abspath(__file__))
+storage_dir_path = os.path.join(app_dir, 'storage')
+data_filename = os.path.join(storage_dir_path, 'data.json')
 
+def get_data():
+    with open(data_filename, 'r') as file:
+        data = json.loads(file.read())
+    return data
+
+def save_to_json(filename, data):
+    json_str = json.dumps(data)
+    with open(filename, 'w') as file:
+        file.write(json_str)
+
+
+POSTS = get_data()
 
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
     return jsonify(POSTS)
 
 @app.errorhandler(400)
-def bad_request(error):
+def bad_request():
     return f"error: Data is invalid!", 400
 
 @app.errorhandler(404)
-def not_found(error):
+def not_found():
     return f"error: Data is not found!", 404
 
 @app.route('/api/posts', methods=['POST'])
@@ -41,7 +53,7 @@ def add_post():
         content = data['content']
         author = data['author']
         date = data['date']
-        formatted_date = datetime.strptim(date, "%Y-%m-%d")
+        formatted_date = datetime.strptime(date, "%Y-%m-%d")
         # Create a new post with a generated ID
         new_post = {
             'id': len(POSTS) + 1,
@@ -51,37 +63,40 @@ def add_post():
             'date': formatted_date
         }
         POSTS.append(new_post)
+
+        save_to_json(data_filename, POSTS)
+
         return jsonify(new_post), 201
     else:
         return bad_request(400)
 
 
-@app.route('/api/posts/<int:id>', methods=['DELETE'])
-def delete_post(id):
+@app.route('/api/posts/<int:post_id>', methods=['DELETE'])
+def delete_post(post_id):
     for line in POSTS:
-        if int(line['id']) == id:
+        if int(line['id']) == post_id:
             POSTS.remove(line)
-            result = {"message": f"Post with id {id} has been deleted successfully."}
+            result = {"message": f"Post with id {post_id} has been deleted successfully."}
             return jsonify(result), 200
 
     result = not_found(404)
     return jsonify(result), 404
 
-@app.route('/api/posts/<int:id>', methods=['PUT'])
-def input_post(id):
+@app.route('/api/posts/<int:post_id>', methods=['PUT'])
+def input_post(post_id):
     data = request.get_json()
     new_title = data.get('title')
     new_content = data.get('content')
     new_author = data.get('author')
     new_date = data.get('date')
-    formatted_new_date = datetime.strptim(new_date, "%Y-%m-%d")
+    formatted_new_date = datetime.strptime(new_date, "%Y-%m-%d")
     for line in POSTS:
-        if int(line['id']) == id:
+        if int(line['id']) == post_id:
             line['title'] = new_title
             line['content'] = new_content
             line['author'] = new_author
             line['date'] = formatted_new_date
-            result = {"message": f"Post with id {id} has been updated successfully."}
+            result = {"message": f"Post with id {post_id} has been updated successfully."}
             return jsonify(result), 200
     result = not_found(404)
     return jsonify(result), 404
@@ -123,4 +138,4 @@ def sort_post(key_sort):
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    app.run(host="0.0.0.0", port=5007, debug=True)
